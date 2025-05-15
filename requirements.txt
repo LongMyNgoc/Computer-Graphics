@@ -1,0 +1,6 @@
+pillow
+PyOpenGL
+PyOpenGL 
+PyOpenGL_accelerate
+pygame
+imgui[pygame]
