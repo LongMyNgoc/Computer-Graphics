@@ -16,68 +16,63 @@ moon_rot = 0.0        # Góc xoay Mặt Trăng quanh trục của nó
 earth_orbit = 0.0     # Góc vị trí Trái Đất trên quỹ đạo quanh Mặt Trời
 moon_orbit = 0.0      # Góc vị trí Mặt Trăng trên quỹ đạo quanh Trái Đất
 sun_rot = 0.0         # Góc xoay của Mặt Trời
-focus_object = None   # Đối tượng đang được camera theo dõi (sun, earth, hoặc None)
-camera_distance = 10  # Khoảng cách camera so với trung tâm cảnh
 
-def DrawGLScene(x, y, stars_texture):
-    """
-    Hàm vẽ toàn bộ cảnh 3D mỗi frame.
-    Tham số:
-        x, y: góc xoay của camera theo trục X và Y
-        stars_texture: ID texture dùng để vẽ skybox (bầu trời sao)
-    """
-    global earth_rot, moon_rot, earth_orbit, moon_orbit, sun_rot, camera_distance, focus_object
+def DrawGLScene(x, y, stars_texture, camera_distance, focus_object):
+    global earth_rot, moon_rot, earth_orbit, moon_orbit, sun_rot  # Sử dụng các biến toàn cục lưu trạng thái quay
 
-    # Xóa buffer màu và độ sâu để chuẩn bị vẽ frame mới
+    # Xóa buffer màu và buffer độ sâu để chuẩn bị vẽ frame mới
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-    glLoadIdentity()  # Đặt lại ma trận modelview
+    glLoadIdentity()  # Reset ma trận hiện tại
 
-    # Dịch camera lùi lại theo trục Z để quan sát toàn cảnh
+    # Di chuyển camera lùi về phía sau theo khoảng cách camera
     glTranslatef(0, 0, -camera_distance)
-    # Xoay cảnh theo góc người dùng điều khiển
-    glRotatef(x, 1, 0, 0)  # Xoay quanh trục X
-    glRotatef(y, 0, 1, 0)  # Xoay quanh trục Y
 
-    # Vẽ skybox (bầu trời sao) trước hết để nó luôn ở phía sau
-    glPushAttrib(GL_ENABLE_BIT)  # Lưu lại trạng thái enable hiện tại
-    glDisable(GL_LIGHTING)       # Tắt ánh sáng để skybox không bị ảnh hưởng
-    glDepthMask(GL_FALSE)        # Tắt ghi depth buffer để skybox không ghi độ sâu
-    drawSkyBox(50, stars_texture) # Vẽ hộp skybox kích thước 50
-    glDepthMask(GL_TRUE)         # Bật lại ghi depth buffer
-    glPopAttrib()                # Khôi phục trạng thái enable trước đó
+    # Xoay camera theo góc x (xoay quanh trục X) và y (xoay quanh trục Y)
+    glRotatef(x, 1, 0, 0)  # Xoay theo trục X
+    glRotatef(y, 0, 1, 0)  # Xoay theo trục Y
 
-    # Vẽ Mặt Trời
-    glPushMatrix()               # Lưu trạng thái ma trận hiện tại
-    glRotatef(sun_rot, 0, 1, 0) # Xoay Mặt Trời quanh trục Y để tạo hiệu ứng quay
-    drawSun()                   # Gọi hàm vẽ Mặt Trời
-    glPopMatrix()                # Khôi phục ma trận
+    # -------- Vẽ Skybox (bầu trời sao) --------
+    glPushAttrib(GL_ENABLE_BIT)   # Lưu trạng thái enable hiện tại
+    glDisable(GL_LIGHTING)        # Tắt ánh sáng để skybox không bị ảnh hưởng bởi đèn
+    glDepthMask(GL_FALSE)         # Tắt ghi vào buffer độ sâu để skybox luôn nằm phía sau
+    drawSkyBox(50, stars_texture) # Vẽ skybox với kích thước 50 đơn vị và texture bầu trời sao
+    glDepthMask(GL_TRUE)          # Bật lại ghi vào buffer độ sâu
+    glPopAttrib()                 # Khôi phục lại trạng thái enable ban đầu
 
-    # Vẽ quỹ đạo Trái Đất quanh Mặt Trời (hình vòng tròn trắng)
+    # -------- Vẽ Mặt Trời --------
+    glPushMatrix()                # Lưu ma trận hiện tại (camera transform)
+    glLoadName(1)                 # Đặt ID tên cho đối tượng (phục vụ picking)
+    glRotatef(sun_rot, 0, 1, 0)  # Quay Mặt Trời quanh trục Y với góc sun_rot
+    drawSun()                    # Vẽ Mặt Trời
+    glPopMatrix()                 # Khôi phục ma trận ban đầu
+
+    # -------- Vẽ quỹ đạo Trái Đất quanh Mặt Trời --------
     glPushMatrix()
-    drawEarthOrbit(5)            # Bán kính quỹ đạo là 5 đơn vị
+    drawEarthOrbit(5)             # Vẽ vòng quỹ đạo bán kính 5 đơn vị
     glPopMatrix()
 
-    # Vẽ Trái Đất và Mặt Trăng
+    # -------- Vẽ Trái Đất và Mặt Trăng --------
     glPushMatrix()
-    glRotatef(earth_orbit, 0, 1, 0)  # Xoay cả nhóm theo quỹ đạo Trái Đất
-    glTranslatef(5, 0, 0)             # Dịch Trái Đất ra vị trí trên quỹ đạo
-    drawEarthAndMoon(earth_rot, moon_rot)  # Vẽ Trái Đất và Mặt Trăng xoay riêng
+    glLoadName(2)                 # Đặt ID tên cho nhóm Trái Đất + Mặt Trăng
+    glRotatef(earth_orbit, 0, 1, 0)   # Quay toàn bộ hệ Trái Đất + Mặt Trăng quanh Mặt Trời
+    glTranslatef(5, 0, 0)         # Dịch chuyển Trái Đất ra vị trí quỹ đạo (cách Mặt Trời 5 đơn vị)
+    drawEarthAndMoon(earth_rot, moon_rot)  # Vẽ Trái Đất xoay và Mặt Trăng xoay quanh Trái Đất
     glPopMatrix()
 
-    # Điều chỉnh khoảng cách camera tùy thuộc đối tượng đang theo dõi
-    if focus_object == "sun":
-        camera_distance = max(camera_distance - 0.1, 4)   # Thu gần camera, tối thiểu 4
-    elif focus_object == "earth":
-        camera_distance = max(camera_distance - 0.1, 6)   # Thu gần camera, tối thiểu 6
-    else:
-        camera_distance = min(camera_distance + 0.1, 10)  # Zoom ra tối đa 10
+    # -------- Điều chỉnh camera theo đối tượng focus --------
+    if focus_object == 1:         # Nếu focus vào Mặt Trời
+        camera_distance = max(camera_distance - 0.1, 4)  # Zoom gần lại, min là 4
+    elif focus_object == 2:       # Nếu focus vào Trái Đất
+        camera_distance = max(camera_distance - 0.1, 6)  # Zoom gần lại, min là 6
+    else:                         # Không focus (chế độ tự do)
+        camera_distance = min(camera_distance + 0.1, 10) # Zoom ra xa, max là 10
 
-    # Cập nhật góc xoay để tạo chuyển động liên tục mỗi frame
-    earth_rot = (earth_rot + 1) % 360        # Trái Đất xoay 1 độ/frame
-    moon_rot = (moon_rot + 13) % 360         # Mặt Trăng xoay nhanh hơn
-    earth_orbit = (earth_orbit + 0.1) % 360  # Trái Đất quay quanh Mặt Trời chậm hơn
-    moon_orbit = (moon_orbit + 0.1) % 360    # Mặt Trăng quay quanh Trái Đất
-    sun_rot = (sun_rot + 0.1) % 360           # Mặt Trời tự quay chậm
+    # -------- Cập nhật các góc quay cho frame tiếp theo --------
+    earth_rot = (earth_rot + 1) % 360      # Trái Đất quay quanh trục của nó nhanh (1 độ/frame)
+    moon_rot = (moon_rot + 13) % 360       # Mặt Trăng quay quanh trục nhanh hơn (13 độ/frame)
+    earth_orbit = (earth_orbit + 0.1) % 360  # Trái Đất quay quanh Mặt Trời chậm hơn (0.1 độ/frame)
+    moon_orbit = (moon_orbit + 0.1) % 360     # Mặt Trăng quay quanh Trái Đất (đang không dùng ở đây?)
+    sun_rot = (sun_rot + 0.1) % 360         # Mặt Trời tự quay nhẹ (0.1 độ/frame)
 
 def InitGL(Width, Height):                
     """
@@ -108,7 +103,7 @@ def InitGL(Width, Height):
     gluPerspective(45.0, float(Width)/float(Height), 0.1, 100.0)  # Thiết lập phối cảnh
     glMatrixMode(GL_MODELVIEW)         # Quay lại chế độ modelview
 
-def pickPlanet(x, y, stars_texture):
+def pickPlanet(x, y, stars_texture, camera_distance, focus_object):
     """
     Hàm xử lý chọn đối tượng bằng kỹ thuật picking OpenGL.
     Tham số:
@@ -136,7 +131,7 @@ def pickPlanet(x, y, stars_texture):
     glMatrixMode(GL_MODELVIEW)
 
     # Vẽ lại toàn bộ cảnh trong chế độ select
-    DrawGLScene(0, 0, stars_texture)
+    DrawGLScene(0, 0, stars_texture, camera_distance, focus_object)
 
     glMatrixMode(GL_PROJECTION)
     glPopMatrix()           # Khôi phục ma trận phép chiếu ban đầu
